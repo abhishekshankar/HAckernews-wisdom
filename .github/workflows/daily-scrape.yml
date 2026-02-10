@@ -26,18 +26,18 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           HN_LIMIT: "100"
         run: |
-          python HAckernews-wisdom/scrape_hn.py
+          python scrape_hn.py
 
       - name: Export daily JSON
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          python HAckernews-wisdom/export_daily.py
+          python export_daily.py
 
       - name: Commit updated JSON
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add HAckernews-wisdom/daily-wisdom-data.json
+          git add daily-wisdom-data.json
           git commit -m "Update daily wisdom data" || echo "No changes"
           git push
