@@ -68,6 +68,14 @@ def db_connect():
     )
 
 
+def reset_conn(conn):
+    try:
+        conn.close()
+    except Exception:
+        pass
+    return db_connect()
+
+
 def ensure_schema(conn):
     schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
     with open(schema_path, "r", encoding="utf-8") as handle:
@@ -282,30 +290,61 @@ def main():
 
     ids_by_type = fetch_story_ids(limit)
 
-    with conn.cursor() as cur:
-        for story_type, ids in ids_by_type.items():
-            for story_id in ids:
-                story = fetch_item(story_id)
-                if not story or story.get("type") != "story":
-                    continue
-                upsert_story(cur, story, story_type, processed_at)
+    cur = conn.cursor()
+    for story_type, ids in ids_by_type.items():
+        for story_id in ids:
+            story = fetch_item(story_id)
+            if not story or story.get("type") != "story":
+                continue
 
-                if story.get("url"):
-                    article = fetch_article(story["url"])
-                    upsert_article(cur, story["id"], article)
-                    text_for_category = f"{story.get('title', '')} {article.get('content', '')}"
-                else:
-                    text_for_category = story.get("title", "")
+            while True:
+                try:
+                    upsert_story(cur, story, story_type, processed_at)
+                    break
+                except psycopg2.OperationalError:
+                    conn = reset_conn(conn)
+                    cur = conn.cursor()
 
-                categories = categorize(text_for_category)
-                store_categories(cur, story["id"], categories)
-                store_cluster(cur, story["id"], categories[0])
+            if story.get("url"):
+                article = fetch_article(story["url"])
+                while True:
+                    try:
+                        upsert_article(cur, story["id"], article)
+                        break
+                    except psycopg2.OperationalError:
+                        conn = reset_conn(conn)
+                        cur = conn.cursor()
+                text_for_category = f"{story.get('title', '')} {article.get('content', '')}"
+            else:
+                text_for_category = story.get("title", "")
 
-                kids = story.get("kids", [])
-                for comment in fetch_comments(story["id"], kids):
-                    upsert_comment(cur, comment["item"], story["id"], comment["depth"])
+            categories = categorize(text_for_category)
+            while True:
+                try:
+                    store_categories(cur, story["id"], categories)
+                    store_cluster(cur, story["id"], categories[0])
+                    break
+                except psycopg2.OperationalError:
+                    conn = reset_conn(conn)
+                    cur = conn.cursor()
 
-                conn.commit()
+            kids = story.get("kids", [])
+            for comment in fetch_comments(story["id"], kids):
+                while True:
+                    try:
+                        upsert_comment(cur, comment["item"], story["id"], comment["depth"])
+                        break
+                    except psycopg2.OperationalError:
+                        conn = reset_conn(conn)
+                        cur = conn.cursor()
+
+            while True:
+                try:
+                    conn.commit()
+                    break
+                except psycopg2.OperationalError:
+                    conn = reset_conn(conn)
+                    cur = conn.cursor()
 
     conn.close()
 
