@@ -4,7 +4,7 @@ import socket
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import psycopg2
 import psycopg2.extras
@@ -40,15 +40,31 @@ def get_env(name: str, default: Optional[str] = None) -> str:
 
 def db_connect():
     db_url = get_env("SUPABASE_DB_URL")
-    if os.environ.get("SUPABASE_FORCE_IPV4", "1") == "1":
-        parsed = urlparse(db_url)
-        if parsed.hostname:
-            try:
-                hostaddr = socket.gethostbyname(parsed.hostname)
-                return psycopg2.connect(db_url, hostaddr=hostaddr)
-            except socket.gaierror:
-                pass
-    return psycopg2.connect(db_url)
+    parsed = urlparse(db_url)
+    if os.environ.get("SUPABASE_FORCE_IPV4", "1") == "1" and parsed.hostname:
+        try:
+            hostaddr = socket.gethostbyname(parsed.hostname)
+        except socket.gaierror:
+            hostaddr = None
+    else:
+        hostaddr = None
+
+    user = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    dbname = (parsed.path or "").lstrip("/") or "postgres"
+    port = parsed.port or 5432
+    host = parsed.hostname or ""
+
+    return psycopg2.connect(
+        dbname=dbname,
+        user=user,
+        password=password,
+        host=host,
+        hostaddr=hostaddr,
+        port=port,
+        sslmode="require",
+        connect_timeout=15,
+    )
 
 
 def ensure_schema(conn):
