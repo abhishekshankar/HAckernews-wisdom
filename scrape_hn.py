@@ -16,6 +16,7 @@ HN_BASE = "https://hacker-news.firebaseio.com/v0"
 HN_TYPES = ["topstories", "newstories", "showstories", "askstories", "jobstories"]
 DEFAULT_LIMIT = 100
 USER_AGENT = "DailyWisdomBot/1.0 (+https://example.com)"
+HN_RETRIES = 4
 
 CATEGORY_KEYWORDS = {
     "AI/ML": ["ai", "ml", "llm", "machine learning", "neural", "model"],
@@ -78,9 +79,16 @@ def ensure_schema(conn):
 
 def hn_get(path: str):
     url = f"{HN_BASE}/{path}.json"
-    resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
-    resp.raise_for_status()
-    return resp.json()
+    for attempt in range(1, HN_RETRIES + 1):
+        try:
+            resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.RequestException as exc:
+            if attempt == HN_RETRIES:
+                print(f"Failed to fetch {url}: {exc}")
+                return None
+            time.sleep(1.5 * attempt)
 
 
 def fetch_story_ids(limit: int) -> Dict[str, List[int]]:
