@@ -53,14 +53,14 @@ def db_connect():
     password = unquote(parsed.password or "")
     dbname = (parsed.path or "").lstrip("/") or "postgres"
     port = parsed.port or 5432
-    host = parsed.hostname or ""
+    host = hostaddr or (parsed.hostname or "")
 
     return psycopg2.connect(
         dbname=dbname,
         user=user,
         password=password,
         host=host,
-        hostaddr=hostaddr,
+        hostaddr=hostaddr if hostaddr else None,
         port=port,
         sslmode="require",
         connect_timeout=15,
