@@ -1,8 +1,10 @@
 import json
 import os
+import socket
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.extras
@@ -38,6 +40,14 @@ def get_env(name: str, default: Optional[str] = None) -> str:
 
 def db_connect():
     db_url = get_env("SUPABASE_DB_URL")
+    if os.environ.get("SUPABASE_FORCE_IPV4", "1") == "1":
+        parsed = urlparse(db_url)
+        if parsed.hostname:
+            try:
+                hostaddr = socket.gethostbyname(parsed.hostname)
+                return psycopg2.connect(db_url, hostaddr=hostaddr)
+            except socket.gaierror:
+                pass
     return psycopg2.connect(db_url)
 
 

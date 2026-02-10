@@ -24,6 +24,7 @@ jobs:
       - name: Run scraper
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_FORCE_IPV4: "1"
           HN_LIMIT: "100"
         run: |
           python scrape_hn.py
@@ -31,6 +32,7 @@ jobs:
       - name: Export daily JSON
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_FORCE_IPV4: "1"
         run: |
           python export_daily.py
 
