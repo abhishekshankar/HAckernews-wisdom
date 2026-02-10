@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Wisdom Dashboard</title>
+    <link rel="stylesheet" href="daily-wisdom.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <div class="glow" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">DW</span>
+        <div>
+          <p class="brand-title">Daily Wisdom</p>
+          <p class="brand-sub">Hacker News knowledge dashboard</p>
+        </div>
+      </div>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search threads, summaries, comments..." />
+        <button id="clearSearch" class="ghost">Clear</button>
+      </div>
+      <div class="view-toggle" role="group" aria-label="View toggle">
+        <button class="chip active" data-view="card">Card view</button>
+        <button class="chip" data-view="list">List view</button>
+        <button id="clusterToggle" class="chip" data-group="cluster">Cluster view</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Dates</h2>
+          <div class="date-controls">
+            <input id="datePicker" type="date" />
+            <div class="chips">
+              <button class="chip" data-range="today">Today</button>
+              <button class="chip" data-range="7">Last 7</button>
+              <button class="chip" data-range="30">Last 30</button>
+              <button class="chip" data-range="all">All</button>
+            </div>
+          </div>
+          <div class="calendar">
+            <div class="calendar-head">
+              <button id="prevMonth" class="ghost small">Prev</button>
+              <span id="monthLabel">Month</span>
+              <button id="nextMonth" class="ghost small">Next</button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Categories</h2>
+          <div id="categoryPills" class="pills"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Clusters</h2>
+          <div id="clusterPills" class="pills"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Advanced Filters</h2>
+          <div class="filters">
+            <label>
+              <span>Minimum score</span>
+              <input id="scoreMin" type="number" min="0" placeholder="e.g. 100" />
+            </label>
+            <label>
+              <span>Minimum comments</span>
+              <input id="commentsMin" type="number" min="0" placeholder="e.g. 50" />
+            </label>
+            <label>
+              <span>Author contains</span>
+              <input id="authorFilter" type="text" placeholder="username" />
+            </label>
+            <button id="resetFilters" class="ghost">Reset filters</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Popular Tags</h2>
+          <div id="tagPills" class="pills muted"></div>
+        </section>
+      </aside>
+
+      <section class="content">
+        <div class="content-head">
+          <div>
+            <p class="eyebrow">Daily digest</p>
+            <h1 id="resultTitle">All wisdom</h1>
+          </div>
+          <div class="head-actions">
+            <p id="resultCount" class="count">0 threads</p>
+            <div class="export">
+              <button id="exportJson" class="ghost">Export JSON</button>
+              <button id="exportCsv" class="ghost">Export CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline">
+          <p class="eyebrow">Recent days</p>
+          <div id="timelineStrip" class="timeline-strip"></div>
+        </div>
+
+        <div class="cluster-bar">
+          <p class="eyebrow">Clusters</p>
+          <div id="clusterBar" class="chips"></div>
+        </div>
+
+        <div id="cards" class="cards" aria-live="polite"></div>
+
+        <table id="list" class="list" aria-live="polite">
+          <thead>
+            <tr>
+              <th>Thread</th>
+              <th>Category</th>
+              <th>Cluster</th>
+              <th>Score</th>
+              <th>Comments</th>
+              <th>Processed</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+
+    <aside id="drawer" class="drawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div>
+          <p class="eyebrow">Thread details</p>
+          <h2 id="drawerTitle">Select a thread</h2>
+        </div>
+        <button id="closeDrawer" class="ghost">Close</button>
+      </div>
+      <div class="drawer-body">
+        <div class="meta" id="drawerMeta"></div>
+        <div class="article">
+          <h3>Linked Article</h3>
+          <p id="drawerArticle"></p>
+          <a id="drawerLink" href="#" target="_blank" rel="noreferrer">Read full article</a>
+        </div>
+        <div class="comments">
+          <h3>Top Comments</h3>
+          <ul id="drawerComments"></ul>
+        </div>
+        <div class="tags">
+          <h3>Tags</h3>
+          <div id="drawerTags" class="tag-row"></div>
+          <div class="tag-input">
+            <input id="tagInput" type="text" placeholder="Add a tag and press Enter" />
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script src="daily-wisdom.js"></script>
+  </body>
+</html>
