@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import socket
 import time
@@ -11,6 +12,14 @@ import psycopg2.extras
 import requests
 from bs4 import BeautifulSoup
 from readability import Document
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 HN_BASE = "https://hacker-news.firebaseio.com/v0"
 HN_TYPES = ["topstories", "newstories", "showstories", "askstories", "jobstories"]
@@ -65,15 +74,41 @@ def db_connect():
         port=port,
         sslmode="require",
         connect_timeout=15,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
     )
 
 
 def reset_conn(conn):
+    logger.warning("Database connection lost, reconnecting...")
     try:
         conn.close()
     except Exception:
         pass
-    return db_connect()
+    new_conn = db_connect()
+    logger.info("Database reconnected successfully")
+    return new_conn
+
+
+MAX_RETRIES = 3
+
+
+def execute_with_retry(conn, cur, operation_name, operation_func):
+    """Execute database operation with retry logic."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            operation_func(cur)
+            return conn, cur
+        except psycopg2.OperationalError as e:
+            if attempt == MAX_RETRIES:
+                logger.error(f"{operation_name} failed after {MAX_RETRIES} attempts: {e}")
+                raise
+            logger.warning(f"{operation_name} failed (attempt {attempt}/{MAX_RETRIES}), retrying...")
+            conn = reset_conn(conn)
+            cur = conn.cursor()
+    return conn, cur
 
 
 def ensure_schema(conn):
@@ -293,60 +328,76 @@ def main():
     cur = conn.cursor()
     for story_type, ids in ids_by_type.items():
         for story_id in ids:
-            story = fetch_item(story_id)
-            if not story or story.get("type") != "story":
+            try:
+                logger.info(f"Processing story {story_id}...")
+
+                # Fetch story data
+                story = fetch_item(story_id)
+                if not story or story.get("type") != "story":
+                    continue
+
+                # === TRANSACTION 1: Story + Article + Metadata ===
+                conn, cur = execute_with_retry(
+                    conn, cur, "story insert",
+                    lambda c: upsert_story(c, story, story_type, processed_at)
+                )
+
+                if story.get("url"):
+                    article = fetch_article(story["url"])
+                    conn, cur = execute_with_retry(
+                        conn, cur, "article insert",
+                        lambda c: upsert_article(c, story["id"], article)
+                    )
+                    text_for_category = f"{story.get('title', '')} {article.get('content', '')}"
+                else:
+                    text_for_category = story.get("title", "")
+
+                categories = categorize(text_for_category)
+                conn, cur = execute_with_retry(
+                    conn, cur, "categories/cluster insert",
+                    lambda c: (store_categories(c, story["id"], categories),
+                               store_cluster(c, story["id"], categories[0]))
+                )
+
+                # Commit story + article + metadata
+                conn.commit()
+                logger.info(f"Story {story_id} ({story.get('title', 'N/A')[:50]}) committed")
+
+                # === TRANSACTION 2+: Comments ===
+                # Validate story exists before inserting comments
+                cur.execute("SELECT 1 FROM stories WHERE id = %s", (story["id"],))
+                if not cur.fetchone():
+                    logger.error(f"Story {story_id} not found in DB after commit, skipping comments")
+                    continue
+
+                kids = story.get("kids", [])
+                if kids:
+                    comments = fetch_comments(story["id"], kids)
+                    logger.info(f"Inserting {len(comments)} comments for story {story_id}")
+
+                    # Insert comments in batches
+                    COMMENT_BATCH_SIZE = 50
+                    for i in range(0, len(comments), COMMENT_BATCH_SIZE):
+                        batch = comments[i:i + COMMENT_BATCH_SIZE]
+                        for comment in batch:
+                            conn, cur = execute_with_retry(
+                                conn, cur, "comment insert",
+                                lambda c: upsert_comment(c, comment["item"], story["id"], comment["depth"])
+                            )
+                        conn.commit()
+                        logger.info(f"Committed {min(i + COMMENT_BATCH_SIZE, len(comments))}/{len(comments)} comments for story {story_id}")
+
+            except Exception as e:
+                logger.error(f"Failed to process story {story_id}: {e}", exc_info=True)
+                # Rollback any partial transaction and continue to next story
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
                 continue
 
-            while True:
-                try:
-                    upsert_story(cur, story, story_type, processed_at)
-                    break
-                except psycopg2.OperationalError:
-                    conn = reset_conn(conn)
-                    cur = conn.cursor()
-
-            if story.get("url"):
-                article = fetch_article(story["url"])
-                while True:
-                    try:
-                        upsert_article(cur, story["id"], article)
-                        break
-                    except psycopg2.OperationalError:
-                        conn = reset_conn(conn)
-                        cur = conn.cursor()
-                text_for_category = f"{story.get('title', '')} {article.get('content', '')}"
-            else:
-                text_for_category = story.get("title", "")
-
-            categories = categorize(text_for_category)
-            while True:
-                try:
-                    store_categories(cur, story["id"], categories)
-                    store_cluster(cur, story["id"], categories[0])
-                    break
-                except psycopg2.OperationalError:
-                    conn = reset_conn(conn)
-                    cur = conn.cursor()
-
-            kids = story.get("kids", [])
-            for comment in fetch_comments(story["id"], kids):
-                while True:
-                    try:
-                        upsert_comment(cur, comment["item"], story["id"], comment["depth"])
-                        break
-                    except psycopg2.OperationalError:
-                        conn = reset_conn(conn)
-                        cur = conn.cursor()
-
-            while True:
-                try:
-                    conn.commit()
-                    break
-                except psycopg2.OperationalError:
-                    conn = reset_conn(conn)
-                    cur = conn.cursor()
-
     conn.close()
+    logger.info("Scraping completed successfully")
 
 
 if __name__ == "__main__":
