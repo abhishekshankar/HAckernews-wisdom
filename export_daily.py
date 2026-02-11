@@ -72,7 +72,12 @@ def fetch_data(cur, target_date: datetime):
         select s.id, s.title, s.url, s.score, s.author, s.processed_at, s.comment_count,
                a.url as article_url, a.content, a.reading_time
         from stories s
-        left join articles a on a.story_id = s.id
+        left join lateral (
+          select url, content, reading_time
+          from articles
+          where articles.story_id = s.id
+          limit 1
+        ) a on true
         where date(s.processed_at) = %s
         """,
         (target_date.date(),)
