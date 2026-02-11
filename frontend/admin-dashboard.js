@@ -124,6 +124,8 @@ async function triggerScraper(limit, storyTypes) {
     scraperStatus.className = 'status-badge running';
     scraperMessage.textContent = 'Scraper is running...';
 
+    addLog('Sending trigger request...');
+
     // Trigger scraper
     const response = await fetch(`${API_BASE}/scraper/trigger`, {
       method: 'POST',
@@ -144,12 +146,19 @@ async function triggerScraper(limit, storyTypes) {
 
     const result = await response.json();
     currentRunId = result.run_id;
-
-    // Connect to WebSocket for updates
-    connectWebSocket();
+    addLog(`Scraper run started (ID: ${currentRunId})`);
+    addLog(`Limit: ${limit} stories per type`);
+    addLog(`Story types: ${storyTypes.join(', ')}`);
 
     // Start elapsed timer
     startElapsedTimer();
+
+    // Poll for status updates
+    pollScraperStatus();
+
+    // Connect to WebSocket for updates (optional, falls back to polling)
+    connectWebSocket();
+
   } catch (error) {
     addLog(`Error: ${error.message}`);
     scraperStatus.textContent = 'Error';
@@ -160,49 +169,112 @@ async function triggerScraper(limit, storyTypes) {
   }
 }
 
+let pollInterval = null;
+
+function pollScraperStatus() {
+  if (pollInterval) clearInterval(pollInterval);
+
+  pollInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/scraper/status`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      if (data.current_run) {
+        const run = data.current_run;
+        storiesCount.textContent = run.stories_processed || '0';
+        errorCount.textContent = run.errors_count || '0';
+
+        if (run.status === 'completed') {
+          clearInterval(pollInterval);
+          scraperStatus.textContent = 'Completed';
+          scraperStatus.className = 'status-badge completed';
+          scraperMessage.textContent = `Successfully processed ${run.stories_processed} stories`;
+          triggerBtn.disabled = false;
+          triggerBtn.style.display = 'inline-block';
+          cancelBtn.style.display = 'none';
+          addLog('Scraper completed successfully!');
+        } else if (run.status === 'failed') {
+          clearInterval(pollInterval);
+          scraperStatus.textContent = 'Failed';
+          scraperStatus.className = 'status-badge failed';
+          scraperMessage.textContent = run.error_message || 'Scraper failed';
+          triggerBtn.disabled = false;
+          triggerBtn.style.display = 'inline-block';
+          cancelBtn.style.display = 'none';
+          addLog(`Scraper failed: ${run.error_message}`);
+        }
+      } else if (!data.is_running) {
+        clearInterval(pollInterval);
+        triggerBtn.disabled = false;
+        triggerBtn.style.display = 'inline-block';
+        cancelBtn.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Poll error:', error);
+    }
+  }, 1000); // Poll every second
+}
+
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}${API_BASE}/scraper/ws`;
 
-  wsConnection = new WebSocket(wsUrl);
+  try {
+    wsConnection = new WebSocket(wsUrl);
 
-  wsConnection.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    wsConnection.onopen = () => {
+      addLog('Connected to live updates');
+    };
 
-    if (data.type === 'log') {
-      addLog(data.message);
-    } else if (data.type === 'progress') {
-      storiesCount.textContent = data.stories_processed || '0';
-      errorCount.textContent = data.errors_count || '0';
-    } else if (data.type === 'status') {
-      if (data.status === 'completed') {
-        scraperStatus.textContent = 'Completed';
-        scraperStatus.className = 'status-badge completed';
-        scraperMessage.textContent = `Successfully processed ${data.stories_processed} stories`;
-        triggerBtn.disabled = false;
-        triggerBtn.style.display = 'inline-block';
-        cancelBtn.style.display = 'none';
-        wsConnection.close();
-      } else if (data.status === 'failed') {
-        scraperStatus.textContent = 'Failed';
-        scraperStatus.className = 'status-badge failed';
-        scraperMessage.textContent = data.error_message || 'Scraper failed';
-        triggerBtn.disabled = false;
-        triggerBtn.style.display = 'inline-block';
-        cancelBtn.style.display = 'none';
-        wsConnection.close();
+    wsConnection.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'log') {
+          addLog(data.message);
+        } else if (data.type === 'progress') {
+          storiesCount.textContent = data.stories_processed || '0';
+          errorCount.textContent = data.errors_count || '0';
+        } else if (data.type === 'status') {
+          if (data.status === 'completed') {
+            clearInterval(pollInterval);
+            scraperStatus.textContent = 'Completed';
+            scraperStatus.className = 'status-badge completed';
+            scraperMessage.textContent = `Successfully processed ${data.stories_processed} stories`;
+            triggerBtn.disabled = false;
+            triggerBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'none';
+            wsConnection.close();
+          } else if (data.status === 'failed') {
+            clearInterval(pollInterval);
+            scraperStatus.textContent = 'Failed';
+            scraperStatus.className = 'status-badge failed';
+            scraperMessage.textContent = data.error_message || 'Scraper failed';
+            triggerBtn.disabled = false;
+            triggerBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'none';
+            wsConnection.close();
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing WebSocket message:', e);
       }
-    }
-  };
+    };
 
-  wsConnection.onerror = (error) => {
-    console.error('WebSocket error:', error);
-    addLog('WebSocket connection error');
-  };
+    wsConnection.onerror = (error) => {
+      console.warn('WebSocket error, using polling:', error);
+      // Will fall back to polling
+    };
 
-  wsConnection.onclose = () => {
-    console.log('WebSocket closed');
-  };
+    wsConnection.onclose = () => {
+      console.log('WebSocket closed');
+    };
+  } catch (error) {
+    console.warn('WebSocket unavailable, using polling:', error);
+    // Polling is already started
+  }
 }
 
 function addLog(message) {
@@ -230,13 +302,18 @@ async function cancelScraper() {
   if (!currentRunId) return;
 
   try {
-    await fetch(`${API_BASE}/scraper/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ run_id: currentRunId })
+    const response = await fetch(`${API_BASE}/scraper/cancel`, {
+      method: 'POST'
     });
 
+    if (!response.ok) {
+      const error = await response.json();
+      addLog(`Error: ${error.detail}`);
+      return;
+    }
+
     addLog('Scraper cancellation requested...');
+    cancelBtn.disabled = true;
   } catch (error) {
     addLog(`Error cancelling: ${error.message}`);
   }
@@ -313,5 +390,8 @@ window.addEventListener('beforeunload', () => {
   }
   if (elapsedInterval) {
     clearInterval(elapsedInterval);
+  }
+  if (pollInterval) {
+    clearInterval(pollInterval);
   }
 });
