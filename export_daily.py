@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import socket
 from datetime import datetime, timezone
@@ -6,6 +7,14 @@ from urllib.parse import unquote, urlparse
 
 import psycopg2
 import psycopg2.extras
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "daily-wisdom-data.json")
@@ -44,6 +53,10 @@ def db_connect():
         port=port,
         sslmode="require",
         connect_timeout=15,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
     )
 
 
@@ -136,17 +149,23 @@ def main():
     with conn.cursor() as cur:
         if target:
             target_date = datetime.fromisoformat(target)
+            logger.info(f"Exporting data for target date: {target_date.date()}")
         else:
             latest = fetch_latest_date(cur)
             if not latest:
                 raise RuntimeError("No stories found to export.")
             target_date = latest
+            logger.info(f"Exporting data for latest date: {target_date.date()}")
+
         data = fetch_data(cur, target_date)
+        logger.info(f"Fetched {len(data)} stories from database")
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2)
+        logger.info(f"Exported data to {OUTPUT_PATH}")
 
     conn.close()
+    logger.info("Export completed successfully")
 
 
 if __name__ == "__main__":

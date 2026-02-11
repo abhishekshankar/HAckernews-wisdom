@@ -13,7 +13,7 @@ create table if not exists stories (
 
 create table if not exists articles (
   id bigserial primary key,
-  story_id bigint references stories(id) on delete cascade,
+  story_id bigint unique references stories(id) on delete cascade,
   url text,
   title text,
   author text,
@@ -49,7 +49,7 @@ create table if not exists story_categories (
 
 create table if not exists clusters (
   id bigserial primary key,
-  name text,
+  name text unique,
   algorithm_version text,
   created_at timestamp
 );

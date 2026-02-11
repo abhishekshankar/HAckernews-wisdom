@@ -228,7 +228,14 @@ def upsert_article(cur, story_id: int, article: dict):
         """
         insert into articles (story_id, url, title, author, publish_date, reading_time, content, status)
         values (%s, %s, %s, %s, %s, %s, %s, %s)
-        on conflict do nothing
+        on conflict (story_id) do update set
+          url = excluded.url,
+          title = excluded.title,
+          author = excluded.author,
+          publish_date = excluded.publish_date,
+          reading_time = excluded.reading_time,
+          content = excluded.content,
+          status = excluded.status
         """,
         (
             story_id,
@@ -286,7 +293,7 @@ def store_cluster(cur, story_id: int, cluster_name: str):
         """
         insert into clusters (name, algorithm_version, created_at)
         values (%s, %s, %s)
-        on conflict do nothing
+        on conflict (name) do nothing
         """,
         (cluster_name, "heuristic-v1", datetime.now(tz=timezone.utc))
     )

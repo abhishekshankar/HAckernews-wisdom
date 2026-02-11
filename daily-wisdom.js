@@ -1,5 +1,9 @@
 const STORAGE_KEY = 'daily-wisdom-tags-v1';
 const DATA_URL = './daily-wisdom-data.json';
+// Optional: connect directly to Supabase REST API.
+// Fill these with your Supabase project values to enable live data.
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
 
 const fallbackData = [
   {
@@ -865,6 +869,27 @@ function wireEvents() {
 }
 
 async function loadData() {
+  const useSupabase = SUPABASE_URL && SUPABASE_ANON_KEY;
+  if (useSupabase) {
+    try {
+      const endpoint = `${SUPABASE_URL}/rest/v1/daily_wisdom_view?select=*`;
+      const response = await fetch(endpoint, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to load Supabase data');
+      }
+      const json = await response.json();
+      return Array.isArray(json) ? json : fallbackData;
+    } catch (error) {
+      return fallbackData;
+    }
+  }
+
   try {
     const response = await fetch(DATA_URL, { cache: 'no-store' });
     if (!response.ok) {
