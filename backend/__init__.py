@@ -1,0 +1,1 @@
+"""Admin dashboard backend package."""

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - Daily Wisdom</title>
+  <link rel="stylesheet" href="admin-dashboard.css" />
+</head>
+<body>
+  <!-- Login Page -->
+  <div id="loginPage" class="login-container">
+    <div class="login-box">
+      <h1>Admin Dashboard</h1>
+      <p class="subtitle">HackerNews Wisdom Scraper</p>
+
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            required
+            placeholder="admin"
+            autocomplete="username"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            placeholder="••••••••"
+            autocomplete="current-password"
+          />
+        </div>
+
+        <button type="submit" class="btn-primary">Login</button>
+        <p id="loginError" class="error-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="dashboardPage" class="dashboard-container" style="display: none;">
+    <!-- Header -->
+    <header class="admin-header">
+      <div class="header-left">
+        <h1>Admin Dashboard</h1>
+      </div>
+      <div class="header-right">
+        <span id="username-display" class="user-info"></span>
+        <button id="logoutBtn" class="btn-logout">Logout</button>
+      </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar">
+      <nav>
+        <section>
+          <h3>Scraper</h3>
+          <a href="#" data-view="scraper-control" class="nav-link active">Control</a>
+          <a href="#" data-view="scraper-history" class="nav-link">Run History</a>
+        </section>
+        <section>
+          <h3>Data Management</h3>
+          <a href="#" data-view="stories" class="nav-link">Stories</a>
+          <a href="#" data-view="categories" class="nav-link">Categories</a>
+          <a href="#" data-view="clusters" class="nav-link">Clusters</a>
+        </section>
+        <section>
+          <h3>System</h3>
+          <a href="#" data-view="analytics" class="nav-link">Analytics</a>
+          <a href="#" data-view="config" class="nav-link">Configuration</a>
+        </section>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <!-- Scraper Control View -->
+      <section id="scraper-control" class="view-section active">
+        <div class="section-header">
+          <h2>Scraper Control</h2>
+          <p class="section-description">Trigger and monitor scraper runs</p>
+        </div>
+
+        <div class="scraper-status">
+          <div class="status-card">
+            <h3>Current Status</h3>
+            <div id="scraperStatus" class="status-badge">Idle</div>
+            <p id="scraperMessage" class="status-message">Ready to run</p>
+          </div>
+
+          <div class="control-card">
+            <h3>Run Scraper</h3>
+            <form id="scraperForm" class="scraper-form">
+              <div class="form-group">
+                <label for="hnLimit">Stories Limit per Type</label>
+                <input type="number" id="hnLimit" min="10" max="500" value="100" />
+                <small>Fetches this many stories from each HN feed (top, new, show, ask, jobs)</small>
+              </div>
+
+              <div class="form-group">
+                <label>Story Types</label>
+                <div class="checkbox-group">
+                  <label><input type="checkbox" name="storyType" value="topstories" checked /> Top Stories</label>
+                  <label><input type="checkbox" name="storyType" value="newstories" checked /> New Stories</label>
+                  <label><input type="checkbox" name="storyType" value="showstories" checked /> Show HN</label>
+                  <label><input type="checkbox" name="storyType" value="askstories" checked /> Ask HN</label>
+                  <label><input type="checkbox" name="storyType" value="jobstories" checked /> Jobs</label>
+                </div>
+              </div>
+
+              <button type="submit" class="btn-primary btn-large" id="triggerBtn">
+                Run Scraper Now
+              </button>
+              <button type="button" class="btn-secondary" id="cancelBtn" style="display: none;">
+                Cancel Run
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Progress Display -->
+        <div id="progressSection" class="progress-section" style="display: none;">
+          <h3>Progress</h3>
+          <div class="progress-info">
+            <p>Stories Processed: <span id="storiesCount">0</span></p>
+            <p>Errors: <span id="errorCount">0</span></p>
+            <p>Elapsed: <span id="elapsed">0s</span></p>
+          </div>
+          <div class="logs-section">
+            <h4>Logs</h4>
+            <div id="logOutput" class="log-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scraper History View -->
+      <section id="scraper-history" class="view-section" style="display: none;">
+        <div class="section-header">
+          <h2>Scraper Run History</h2>
+          <p class="section-description">View past scraper executions</p>
+        </div>
+        <div id="historyContent" class="content-placeholder">
+          <p>Run history will appear here...</p>
+        </div>
+      </section>
+
+      <!-- Stories View -->
+      <section id="stories" class="view-section" style="display: none;">
+        <div class="section-header">
+          <h2>Stories Management</h2>
+          <p class="section-description">Manage imported stories from Hacker News</p>
+        </div>
+        <div id="storiesContent" class="content-placeholder">
+          <p>Stories will appear here...</p>
+        </div>
+      </section>
+
+      <!-- Categories View -->
+      <section id="categories" class="view-section" style="display: none;">
+        <div class="section-header">
+          <h2>Categories Management</h2>
+          <p class="section-description">Manage story categories and keywords</p>
+        </div>
+        <div id="categoriesContent" class="content-placeholder">
+          <p>Categories will appear here...</p>
+        </div>
+      </section>
+
+      <!-- Clusters View -->
+      <section id="clusters" class="view-section" style="display: none;">
+        <div class="section-header">
+          <h2>Clusters Management</h2>
+          <p class="section-description">Manage story clusters and groupings</p>
+        </div>
+        <div id="clustersContent" class="content-placeholder">
+          <p>Clusters will appear here...</p>
+        </div>
+      </section>
+
+      <!-- Analytics View -->
+      <section id="analytics" class="view-section" style="display: none;">
+        <div class="section-header">
+          <h2>Analytics</h2>
+          <p class="section-description">View system analytics and insights</p>
+        </div>
+        <div id="analyticsContent" class="content-placeholder">
+          <p>Analytics will appear here...</p>
+        </div>
+      </section>
+
+      <!-- Configuration View -->
+      <section id="config" class="view-section" style="display: none;">
+        <div class="section-header">
+          <h2>Configuration</h2>
+          <p class="section-description">Manage system settings and configuration</p>
+        </div>
+        <div id="configContent" class="content-placeholder">
+          <p>Configuration options will appear here...</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin-dashboard.js"></script>
+</body>
+</html>
