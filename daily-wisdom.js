@@ -1,9 +1,10 @@
 const STORAGE_KEY = 'daily-wisdom-tags-v1';
 const DATA_URL = './daily-wisdom-data.json';
-// Optional: connect directly to Supabase REST API.
-// Fill these with your Supabase project values to enable live data.
-const SUPABASE_URL = '';
-const SUPABASE_ANON_KEY = '';
+const CONFIG_SERVER = 'http://127.0.0.1:8080';
+
+// Loaded dynamically from config server
+let SUPABASE_URL = '';
+let SUPABASE_ANON_KEY = '';
 
 const fallbackData = [
   {
@@ -868,6 +869,20 @@ function wireEvents() {
   });
 }
 
+async function loadConfig() {
+  try {
+    const response = await fetch(`${CONFIG_SERVER}/api/config`);
+    if (response.ok) {
+      const config = await response.json();
+      SUPABASE_URL = config.supabaseUrl || '';
+      SUPABASE_ANON_KEY = config.supabaseAnonKey || '';
+      console.log('Loaded Supabase config from server');
+    }
+  } catch (error) {
+    console.warn('Config server unavailable, will use local data only:', error.message);
+  }
+}
+
 async function loadData() {
   const useSupabase = SUPABASE_URL && SUPABASE_ANON_KEY;
   if (useSupabase) {
@@ -886,6 +901,7 @@ async function loadData() {
       const json = await response.json();
       return Array.isArray(json) ? json : fallbackData;
     } catch (error) {
+      console.warn('Supabase fetch failed, falling back to local data:', error.message);
       return fallbackData;
     }
   }
@@ -898,11 +914,13 @@ async function loadData() {
     const json = await response.json();
     return Array.isArray(json) ? json : fallbackData;
   } catch (error) {
+    console.warn('Local data fetch failed, using fallback:', error.message);
     return fallbackData;
   }
 }
 
 async function init() {
+  await loadConfig();
   data = await loadData();
   hydrateTags();
   setBaseDate();
