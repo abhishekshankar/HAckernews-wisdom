@@ -161,6 +161,11 @@ class ScraperManager:
 
             # Import and run scraper
             try:
+                # Add parent directory to path to import scrape_hn
+                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if parent_dir not in sys.path:
+                    sys.path.insert(0, parent_dir)
+
                 from scrape_hn import main as scrape_main
 
                 # Redirect stdout/stderr
@@ -177,11 +182,14 @@ class ScraperManager:
                     # Run scraper
                     scrape_main()
 
-            except ImportError:
-                log_capture.write("ERROR: Could not import scrape_hn module")
+            except ImportError as e:
+                error_msg = f"ERROR: Could not import scrape_hn module: {str(e)}"
+                log_capture.write(error_msg)
+                logger.error(error_msg, exc_info=True)
                 errors += 1
             except Exception as e:
-                log_capture.write(f"ERROR: Scraper failed: {str(e)}")
+                error_msg = f"ERROR: Scraper failed: {str(e)}"
+                log_capture.write(error_msg)
                 logger.error(f"Scraper error: {e}", exc_info=True)
                 errors += 1
 

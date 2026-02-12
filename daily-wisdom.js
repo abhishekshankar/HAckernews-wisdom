@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'daily-wisdom-tags-v1';
 const DATA_URL = './daily-wisdom-data.json';
-const CONFIG_SERVER = 'http://127.0.0.1:8080';
+const CONFIG_SERVER = 'http://127.0.0.1:9876';
 
 // Loaded dynamically from config server
 let SUPABASE_URL = '';

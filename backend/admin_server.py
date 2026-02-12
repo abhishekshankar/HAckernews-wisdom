@@ -13,7 +13,7 @@ from pathlib import Path
 from .auth import authenticate_user, create_session, get_current_user, create_admin
 from .database import get_connection
 from .models import LoginRequest, LoginResponse, UserResponse, PublicConfigResponse
-from .routers import scraper
+from .routers import scraper, data
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +65,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(scraper.router)
+app.include_router(data.router)
 
 
 # Dependency to get current user

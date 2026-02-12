@@ -29,10 +29,7 @@ router = APIRouter(prefix="/api/scraper", tags=["scraper"])
 
 
 @router.post("/trigger", response_model=dict)
-async def trigger_scraper(
-    request: ScraperTriggerRequest,
-    current_user: dict = Depends(lambda session_id: {"id": 1, "username": "admin"})
-):
+async def trigger_scraper(request: ScraperTriggerRequest):
     """
     Trigger a new scraper run with optional configuration override.
 
@@ -51,12 +48,12 @@ async def trigger_scraper(
         run_id = manager.trigger_scrape(
             limit=request.limit or 100,
             story_types=request.story_types,
-            username=current_user.get("username", "system")
+            username="admin"
         )
 
         # Log audit
         log_audit(
-            current_user.get("username", "system"),
+            "system",
             "scraper_start",
             "scraper_run",
             run_id,
@@ -147,7 +144,7 @@ async def cancel_scraper(current_user: dict = Depends(lambda: {"id": 1})):
         # Log audit
         run_id = manager.get_current_run_id()
         log_audit(
-            current_user.get("username", "system"),
+            "admin",
             "scraper_cancel",
             "scraper_run",
             run_id
